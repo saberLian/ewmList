@@ -3,8 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <!-- import CSS -->
-    <!-- <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css" /> -->
+    <title>lian</title>
     <style>
         body {
             width: 100vw;
@@ -17,24 +16,30 @@
     <div id="app">
         <van-tree-select height="55vw" :items="items" :main-active-index.sync="active">
             <template #content>
-          <van-image v-for="(v,i) in items" width="500" v-if="active==i" :key="i" :src="items[active].img" />
+          <van-image
+            v-for="(v,i) in items"
+            width="500"
+            v-if="active==i"
+            :key="i"
+            :src="items[active].img"
+          />
         </template>
         </van-tree-select>
-        <van-form>
-            <van-field v-model="form.text" name="图片名字" label="图片名字" placeholder="图片名字" :rules="[{ required: true, message: '请填写图片名字' }]" />
-
-            <div style="margin: 16px">
-                <van-button round block type="info" native-type="submit">提交</van-button>
-            </div>
-        </van-form>
-        <van-field name="uploader" label="文件上传" :rules="[{ required: true, message: '请上传' }]">
-            <template #input>
-          <van-uploader v-model="uploader" />
-        </template>
-        </van-field>
-        <div style="margin: 16px">
+        <ul>
+            <li style="margin: 10px;" v-for="(v,i) in items" :key="i">
+                <p>text:<input type="text" v-model="v.text" /></p>
+                <p>img:<input type="text" v-model="v.img" /></p>
+                <van-button type="primary" @click="del(i)" size="mini">delete</van-button>
+                <van-button type="primary" @click="up(i)" size="mini">↑</van-button>
+                <van-button type="primary" @click="down(i)" size="mini">↓</van-button>
+            </li>
+        </ul>
+        <van-button type="info" @click="add()" size="mini" style="margin: 20px 0;">add</van-button>
+        <div style="margin: 20px">
             <van-button round block type="info" @click="submit" native-type="submit">提交</van-button>
         </div>
+
+        <van-button type="warning" @click="deleteAll()" size="mini">deleteAll</van-button>
     </div>
 </body>
 <!-- import Vue before Element -->
@@ -49,99 +54,53 @@
         data: function() {
             return {
                 active: 0,
-                items: [],
-                form: {
-                    img: "",
-                    text: "",
-                },
-                uploader: [],
+                items: []
             };
         },
         methods: {
             submit() {
-                if (!this.uploader.length) return;
-                console.log(this.uploader[0].content);
-                this.form.img = this.uploader[0].content;
-                let ewmList = localStorage.ewmList ? JSON.parse(localStorage.ewmList) : [];
-                ewmList.push(this.form);
-                localStorage.ewmList = JSON.stringify(ewmList);
-                this.items = localStorage.ewmList ?
-                    JSON.parse(localStorage.ewmList) : [];
-                this.form = {
-                    img: "",
-                    text: "",
-                }
-                this.uploader = []
+                this.setLocastorage('ewmList', this.items)
+            },
+            del(i) {
+                this.items.splice(i, 1);
+            },
+            up(index) {
+                if (index == 0) return;
+                this.swapArray(this.items, index - 1, index)
+            },
+            down(index) {
+                if (index == this.items.length - 1) return;
+                this.swapArray(this.items, index, index + 1)
+            },
+            add() {
+                this.items.push({
+                    img: '',
+                    text: ''
+                })
+            },
+            deleteAll() {
+                this.items = []
+                this.clearLocastorage('ewmList')
+            },
+            //数组元素互换位置
+            swapArray(arr, index1, index2) {
+                arr[index1] = arr.splice(index2, 1, arr[index1])[0];
+                return arr;
+            },
+            setLocastorage(item, val) {
+                localStorage[item] = JSON.stringify(val);
+            },
+            getLocalstorage(item) {
+                return localStorage[item] ? JSON.parse(localStorage[item]) : [];
+            },
+            clearLocastorage(item) {
+                localStorage[item] = "";
             },
         },
         created() {
-            this.items = localStorage.ewmList ?
-                JSON.parse(localStorage.ewmList) : [];
+            this.items = this.getLocalstorage("ewmList");
         },
     });
-    /**
-     * @name 文件压缩
-     * @description
-     *  1、将文件转img对象
-     *  2、获取文件宽高比例
-     *  3、自定义等比例缩放宽高属性，这里我用的是固定800宽度，高度是等比例缩放
-     *  4、canvas重新绘制图片
-     *  5、canvas转二进制对象转文件对象，返回
-     * @returns { File } 文件
-     */
-    async function imgCompress(file) {
-        // 将文件转img对象
-        const img = await fileToImg(file);
-        return new Promise((resolve, reject) => {
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            // 获取文件宽高比例
-            const {
-                width: originWidth,
-                height: originHeight
-            } = img;
-            // 自定义等比例缩放宽高属性，这里我用的是固定800宽度，高度是等比例缩放
-            const scale = +(originWidth / originHeight).toFixed(2); // 比例取小数点后两位)
-            const targetWidth = 800; // 固定宽
-            const targetHeight = Math.round(800 / scale); // 等比例缩放高
-
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            context.clearRect(0, 0, targetWidth, targetHeight);
-            // canvas重新绘制图片
-            context.drawImage(img, 0, 0, targetWidth, targetHeight);
-            // canvas转二进制对象转文件对象，返回
-            const type = "image/png";
-            canvas.toBlob(function(blob) {
-                const f = new File([blob], file.name, {
-                    type,
-                    lastModified: file.lastModified,
-                });
-                resolve(f);
-            }, type);
-        });
-    }
-
-    // file转换成img对象
-    function fileToImg(file) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                img.src = e.target.result;
-            };
-            reader.onerror = function(e) {
-                reject(e);
-            };
-            reader.readAsDataURL(file);
-            img.onload = function() {
-                resolve(img);
-            };
-            img.onerror = function(e) {
-                reject(e);
-            };
-        });
-    }
 </script>
 
 </html>
